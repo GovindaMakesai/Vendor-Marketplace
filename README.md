@@ -111,11 +111,23 @@ Generating recommendations replaces the stored rows for that requirement and set
 
 ## AI Architecture
 
-`POST /api/work-requirements/:id/ai-summary` sends the requirement and the stored score breakdown to the model named by `OPENAI_MODEL`. The prompt tells the model to use only the supplied data and not to invent documents, certifications, or capabilities.
+```text
+Deterministic Recommendation Engine
+             ↓
+        AI Explanation
+             ↓
+       Structured Output
+```
 
-The response must contain `summary`, `strengths`, `risks`, `tradeoffs`, and `recommendation`. The payload is checked with Zod. A successful model response is marked `generatedBy: "openai"`.
+Business rules stay deterministic. The recommendation engine decides eligibility, compliance, score, and rank. OpenAI is only a decision-support explanation layer. It receives the already calculated result for the leading vendor and must not change the score or the ranking.
 
-If the API key is missing, the request times out, the provider returns an error, or the payload is invalid, the API builds the same sections from the stored ranking and marks them `generatedBy: "fallback"`. The application does not fail closed when AI is unavailable.
+`POST /api/work-requirements/:id/ai-summary` is authenticated and is called only when an operator clicks **Generate AI Summary**. Loading the dashboard, vendors, work requirements, or recommendations does not call OpenAI.
+
+The server reads `OPENAI_MODEL` from the environment and calls the OpenAI Responses API with structured output. The model must return `summary`, `strengths`, `risks`, `tradeoffs`, and `recommendation`. The application checks that payload again with Zod. A successful response is marked `generatedBy: "openai"`.
+
+If the API key is missing, AI is disabled, the daily limit is reached, the request times out, the provider returns an error, or the payload is invalid, the API builds the same sections from the stored ranking and marks them `generatedBy: "fallback"`. `AI_PROVIDER=mock` returns a local sample and does not call OpenAI. Automatic retries are disabled. Each summary request makes at most one OpenAI call.
+
+Development usage is limited by `AI_DAILY_REQUEST_LIMIT` (20 by default). The counter is stored in `ai_usage_daily` and resets on the next UTC calendar date. The OpenAI API key stays in the server environment. It is not sent to the browser, written into API responses, or recorded in logs.
 
 ## Security
 
@@ -133,7 +145,7 @@ Self-registration creates an `OPERATIONS` user. The seeded administrator is crea
 
 ## Testing
 
-Backend tests cover the recommendation rules and the API flows for registration, login, vendor creation, vendor listing, requirement creation, recommendation generation, and the AI fallback. Recommendation tests call the scoring service directly. API tests use an in-memory stand-in for Prisma so they do not need a running database.
+Backend tests cover the recommendation rules, authentication, vendor and requirement APIs, the OpenAI explanation provider, fallback and mock behaviour, the daily AI limit, and rejection of unauthenticated summary requests. Recommendation tests call the scoring service directly. API tests use an in-memory stand-in for Prisma so they do not need a running database. AI provider tests use a stand-in client and do not call OpenAI.
 
 ```bash
 npm test --prefix server
@@ -167,12 +179,17 @@ DIRECT_URL=
 JWT_SECRET=
 JWT_EXPIRES_IN=7d
 OPENAI_API_KEY=
-OPENAI_MODEL=gpt-4o-mini
+OPENAI_MODEL=gpt-5.4-mini
+AI_ENABLED=true
+AI_PROVIDER=openai
+AI_DAILY_REQUEST_LIMIT=20
+AI_MAX_OUTPUT_TOKENS=300
+AI_TIMEOUT_MS=15000
 CLIENT_URL=http://localhost:5173
 PORT=5000
 ```
 
-`DATABASE_URL` should be the pooled Supabase connection. `DIRECT_URL` should be the direct connection used by Prisma migrations. Leave `OPENAI_API_KEY` empty to use the fallback summary. Change `OPENAI_MODEL` to switch models without editing source code.
+`DATABASE_URL` should be the pooled Supabase connection. `DIRECT_URL` should be the direct connection used by Prisma migrations. Leave `OPENAI_API_KEY` empty to use the fallback summary. Change `OPENAI_MODEL` to switch models without editing source code. Set `AI_PROVIDER=mock` while building the interface so no OpenAI credit is used.
 
 Frontend:
 
@@ -237,7 +254,7 @@ Set `CLIENT_URL` to the deployed frontend origin. Do not put database credential
 - Document files are metadata only, so there is no object storage or virus scanning.
 - API tests mock Prisma. They prove request handling and scoring integration without requiring Supabase during unit tests. Migration and seed still need the real database.
 - Helmet's content security policy is relaxed so Swagger UI can load. The other Helmet headers remain enabled.
-- The AI call is short and has no retry loop. A failed call returns the deterministic summary instead of blocking the user.
+- The AI call is short, stateless, and has no retry loop. A failed call returns the deterministic summary instead of blocking the user. The daily counter is the credit-protection limit.
 
 ## Future Improvements
 

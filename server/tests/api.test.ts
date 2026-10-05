@@ -383,6 +383,35 @@ describe("API", () => {
     expect(summary.body.data.generatedBy).toBe("fallback");
     expect(summary.body.data.summary).toContain("Alpha Electric");
     expect(summary.body.data.strengths.length).toBeGreaterThan(0);
+    expect(JSON.stringify(summary.body)).not.toMatch(/sk-[A-Za-z0-9_-]+/);
+  });
+
+  it("rejects an unauthenticated AI summary request", async () => {
+    const response = await request(app).post("/api/work-requirements/req_missing/ai-summary");
+    expect(response.status).toBe(401);
+    expect(response.body.error.code).toBe("UNAUTHORIZED");
+    expect(JSON.stringify(response.body)).not.toMatch(/sk-/);
+  });
+
+  it("requires stored recommendations before an AI summary", async () => {
+    const token = await authToken();
+    const requirement = await request(app).post("/api/work-requirements").set("Authorization", `Bearer ${token}`).send({
+      title: "Sydney electrical works",
+      description: "Requirement without a generated ranking.",
+      category: "Electrical",
+      location: "Sydney",
+      estimatedValue: 90000,
+      priority: "HIGH",
+      expectedStartDate: "2026-12-01",
+    });
+
+    const summary = await request(app)
+      .post(`/api/work-requirements/${requirement.body.data.id}/ai-summary`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(summary.status).toBe(400);
+    expect(summary.body.error.code).toBe("RECOMMENDATIONS_REQUIRED");
+    expect(summary.body.success).toBe(false);
   });
 
   it("reports a healthy API", async () => {

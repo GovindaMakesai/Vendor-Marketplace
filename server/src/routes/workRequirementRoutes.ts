@@ -1,9 +1,5 @@
 import { Router } from "express";
-import {
-  createSummary,
-  generateRecommendations,
-  listRecommendations,
-} from "../controllers/recommendationController";
+import { generateRecommendations, listRecommendations } from "../controllers/recommendationController";
 import {
   createRequirement,
   deleteRequirement,
@@ -23,4 +19,3 @@ workRequirementRoutes.put("/:id", updateRequirement);
 workRequirementRoutes.delete("/:id", deleteRequirement);
 workRequirementRoutes.post("/:id/recommendations", generateRecommendations);
 workRequirementRoutes.get("/:id/recommendations", listRecommendations);
-workRequirementRoutes.post("/:id/ai-summary", createSummary);

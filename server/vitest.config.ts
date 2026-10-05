@@ -15,7 +15,12 @@ export default defineConfig({
       CLIENT_URL: "http://localhost:5173",
       PORT: "5000",
       OPENAI_API_KEY: "",
-      OPENAI_MODEL: "gpt-4o-mini",
+      OPENAI_MODEL: "gpt-5.4-mini",
+      AI_ENABLED: "true",
+      AI_PROVIDER: "openai",
+      AI_DAILY_REQUEST_LIMIT: "20",
+      AI_MAX_OUTPUT_TOKENS: "300",
+      AI_TIMEOUT_MS: "15000",
     },
   },
 });

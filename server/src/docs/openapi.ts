@@ -309,7 +309,7 @@ export const openApiSpec = {
       post: {
         tags: ["Recommendations"],
         summary: "Explain stored recommendations",
-        description: "Uses OpenAI when configured. Falls back to a deterministic summary. The model cannot change scores or ranks.",
+        description: "Explains the stored ranking with OpenAI structured output. The model cannot change scores, ranks, eligibility, or compliance. Missing credentials, provider errors, and the daily request limit return a deterministic fallback. Set AI_PROVIDER=mock to skip OpenAI.",
         security: [{ bearerAuth: [] }],
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
         responses: { "200": { description: "Summary, strengths, risks, trade-offs, and generatedBy" } },

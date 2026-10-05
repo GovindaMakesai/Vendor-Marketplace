@@ -109,7 +109,8 @@ export type AiSummary = {
   risks: string[];
   tradeoffs: string[];
   recommendation: string;
-  generatedBy: "openai" | "fallback";
+  generatedBy: "openai" | "fallback" | "mock";
+  fallbackReason?: string;
 };
 
 export type Pagination = {
