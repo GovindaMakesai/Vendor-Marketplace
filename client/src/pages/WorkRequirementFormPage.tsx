@@ -64,7 +64,7 @@ export function WorkRequirementFormPage() {
               </option>
             ))}
           </Select>
-          <Input label="Expected start date" name="expectedStartDate" type="date" value={form.expectedStartDate} onChange={(event) => setForm({ ...form, expectedStartDate: event.target.value })} required />
+          <Input label="Expected start date" name="expectedStartDate" type="date" min="1900-01-01" max="9999-12-31" value={form.expectedStartDate} onChange={(event) => setForm({ ...form, expectedStartDate: event.target.value })} required />
           {mutation.isError ? <p className="text-sm text-bad md:col-span-2">{errorMessage(mutation.error)}</p> : null}
           <div>
             <Button type="submit" loading={mutation.isPending}>

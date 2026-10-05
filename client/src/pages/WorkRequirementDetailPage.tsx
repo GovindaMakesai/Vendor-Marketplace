@@ -143,7 +143,7 @@ export function WorkRequirementDetailPage() {
               </option>
             ))}
           </Select>
-          <Input label="Expected start" name="expectedStartDate" type="date" value={form?.expectedStartDate ?? ""} onChange={(event) => setForm({ ...(form as RequirementInput), expectedStartDate: event.target.value })} required />
+          <Input label="Expected start" name="expectedStartDate" type="date" min="1900-01-01" max="9999-12-31" value={form?.expectedStartDate ?? ""} onChange={(event) => setForm({ ...(form as RequirementInput), expectedStartDate: event.target.value })} required />
           <Select label="Status" name="status" value={form?.status ?? "OPEN"} onChange={(event) => setForm({ ...(form as RequirementInput), status: event.target.value as RequirementStatus })}>
             {["DRAFT", "OPEN", "RECOMMENDATIONS_GENERATED", "AWARDED", "CLOSED"].map((status) => (
               <option key={status} value={status}>

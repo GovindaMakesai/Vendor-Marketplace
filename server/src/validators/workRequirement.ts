@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { calendarDateSchema } from "./calendarDate";
 import { limitSchema, optionalQueryString, pageSchema } from "./common";
 
 export const prioritySchema = z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]);
@@ -17,7 +18,7 @@ export const workRequirementBodySchema = z.object({
   location: z.string().trim().min(2).max(120),
   estimatedValue: z.coerce.number().positive().max(1_000_000_000),
   priority: prioritySchema,
-  expectedStartDate: z.coerce.date(),
+  expectedStartDate: calendarDateSchema,
   status: requirementStatusSchema.optional(),
 });
 

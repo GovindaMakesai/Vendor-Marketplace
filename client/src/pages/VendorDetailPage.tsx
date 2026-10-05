@@ -283,8 +283,8 @@ export function VendorDetailPage() {
             ))}
           </Select>
           <Input label="Number" name="documentNumber" value={documentForm.documentNumber} onChange={(event) => setDocumentForm({ ...documentForm, documentNumber: event.target.value })} required />
-          <Input label="Issued" name="issuedDate" type="date" value={documentForm.issuedDate} onChange={(event) => setDocumentForm({ ...documentForm, issuedDate: event.target.value })} required />
-          <Input label="Expiry" name="expiryDate" type="date" value={documentForm.expiryDate} onChange={(event) => setDocumentForm({ ...documentForm, expiryDate: event.target.value })} required />
+          <Input label="Issued" name="issuedDate" type="date" min="1900-01-01" max="9999-12-31" value={documentForm.issuedDate} onChange={(event) => setDocumentForm({ ...documentForm, issuedDate: event.target.value })} required />
+          <Input label="Expiry" name="expiryDate" type="date" min="1900-01-01" max="9999-12-31" value={documentForm.expiryDate} onChange={(event) => setDocumentForm({ ...documentForm, expiryDate: event.target.value })} required />
           <Select label="Status" name="status" value={documentForm.status} onChange={(event) => setDocumentForm({ ...documentForm, status: event.target.value })}>
             <option value="VALID">Valid</option>
             <option value="PENDING">Pending</option>

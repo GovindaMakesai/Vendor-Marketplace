@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { calendarDateSchema } from "./calendarDate";
 
 export const documentTypeSchema = z.enum([
   "TAX_REGISTRATION",
@@ -20,17 +21,35 @@ const optionalUrl = z
     message: "File URL must be a valid URL",
   });
 
-export const documentBodySchema = z.object({
+const documentFieldsSchema = z.object({
   documentType: documentTypeSchema,
   documentNumber: z.string().trim().min(2).max(80),
-  issuedDate: z.coerce.date(),
-  expiryDate: z.coerce.date(),
+  issuedDate: calendarDateSchema,
+  expiryDate: calendarDateSchema,
   status: documentStatusSchema.optional(),
   fileName: z.string().trim().max(180).optional(),
   fileUrl: optionalUrl,
   notes: z.string().trim().max(1000).optional(),
 });
 
-export const documentUpdateSchema = documentBodySchema.partial().refine((value) => Object.keys(value).length > 0, {
-  message: "At least one field is required",
-});
+function expiryOnOrAfterIssued(
+  value: { issuedDate?: Date; expiryDate?: Date },
+  context: z.RefinementCtx,
+) {
+  if (value.issuedDate && value.expiryDate && value.expiryDate < value.issuedDate) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["expiryDate"],
+      message: "Expiry date must be on or after the issued date",
+    });
+  }
+}
+
+export const documentBodySchema = documentFieldsSchema.superRefine(expiryOnOrAfterIssued);
+
+export const documentUpdateSchema = documentFieldsSchema
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "At least one field is required",
+  })
+  .superRefine(expiryOnOrAfterIssued);
