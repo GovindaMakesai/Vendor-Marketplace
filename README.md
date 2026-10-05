@@ -224,9 +224,11 @@ DemoAdmin#2026
 
 ## Deployment
 
-Frontend: deploy `client/` to Vercel. Set `VITE_API_URL` to `https://<api-host>/api`. `client/vercel.json` rewrites application routes to `index.html`.
+One Vercel project serves both parts. The root `vercel.json` sends `/api` and `/health` to the Express service and every other path to the Vite dashboard. The browser calls `/api` on that same domain. Do not set `VITE_API_URL` for this setup. Do not set a service-binding variable; Vercel injects those itself, and this app does not use an internal binding because the dashboard runs in the browser.
 
-Backend: deploy `server/` to a Render-compatible Node service.
+Set these on the Vercel project, not in the frontend bundle: `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `AI_ENABLED`, `AI_PROVIDER`, `AI_DAILY_REQUEST_LIMIT`, `AI_MAX_OUTPUT_TOKENS`, `AI_TIMEOUT_MS`, and `CLIENT_URL` (the exact `https://` site origin, with no trailing slash).
+
+A separate Render API is optional. If you use it, the start command must be `npm run start`. The build command is only `npm install --include=dev && npm run build`. Set `VITE_API_URL` to `https://<render-host>/api` when the dashboard is not on the same host as the API.
 
 ```text
 Build:  npm install --include=dev && npm run build
@@ -234,7 +236,7 @@ Start:  npm run start
 Release: npx prisma migrate deploy
 ```
 
-Set `CLIENT_URL` to the deployed frontend origin. Do not put database credentials, `JWT_SECRET`, or `OPENAI_API_KEY` in frontend environment variables.
+Do not put database credentials, `JWT_SECRET`, or `OPENAI_API_KEY` in frontend environment variables.
 
 `GET /health` returns `{ "success": true, "message": "API is healthy" }`.
 

@@ -31,6 +31,12 @@ export function createApp() {
           callback(null, true);
           return;
         }
+        // Preview deployments each have their own host. Same-origin /api calls
+        // send that host, and the API still requires a JWT.
+        if (process.env.VERCEL && origin.endsWith(".vercel.app")) {
+          callback(null, true);
+          return;
+        }
         callback(null, false);
       },
     }),
