@@ -16,10 +16,19 @@ export const TOKEN_KEY = "vrp_token";
 
 const LIVE_API_URL = "https://vendor-marketplace-cmhd.onrender.com/api";
 
+function ignoresProductionOverride(configured: string) {
+  if (configured.startsWith("/")) return true;
+  try {
+    return new URL(configured).hostname.endsWith(".vercel.app");
+  } catch {
+    return true;
+  }
+}
+
 export function getApiUrl() {
-  const configured = import.meta.env.VITE_API_URL?.trim();
-  if (configured) return configured.replace(/\/$/, "");
-  if (import.meta.env.DEV) return "http://localhost:5000/api";
+  const configured = import.meta.env.VITE_API_URL?.trim().replace(/\/$/, "");
+  if (import.meta.env.DEV) return configured || "http://localhost:5000/api";
+  if (configured && !ignoresProductionOverride(configured)) return configured;
   return LIVE_API_URL;
 }
 
