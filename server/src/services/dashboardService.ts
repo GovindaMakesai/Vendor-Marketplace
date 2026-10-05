@@ -4,6 +4,16 @@ import { round2, toNumber } from "../utils/numbers";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
+const VENDOR_STATUSES = ["ACTIVE", "INACTIVE", "SUSPENDED"] as const;
+const REQUIREMENT_STATUSES = ["DRAFT", "OPEN", "RECOMMENDATIONS_GENERATED", "AWARDED", "CLOSED"] as const;
+const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
+const DOCUMENT_STATUSES = ["VALID", "EXPIRED", "PENDING", "REJECTED"] as const;
+
+function series(rows: Array<{ label: string; count: number }>, order: readonly string[]) {
+  const counts = new Map(rows.map((row) => [row.label, row.count]));
+  return order.map((label) => ({ label, count: counts.get(label) ?? 0 }));
+}
+
 export class DashboardService {
   async stats() {
     const today = startOfUtcDay();
@@ -59,6 +69,14 @@ export class DashboardService {
       }),
     ]);
 
+    const [vendorsByStatus, requirementsByStatus, requirementsByPriority, vendorsByCategory, documentsByStatus] = await Promise.all([
+      prisma.vendor.groupBy({ by: ["status"], _count: { _all: true } }),
+      prisma.workRequirement.groupBy({ by: ["status"], _count: { _all: true } }),
+      prisma.workRequirement.groupBy({ by: ["priority"], _count: { _all: true } }),
+      prisma.vendor.groupBy({ by: ["category"], _count: { _all: true } }),
+      prisma.vendorDocument.groupBy({ by: ["status"], _count: { _all: true } }),
+    ]);
+
     return {
       totalVendors,
       activeVendors,
@@ -68,6 +86,26 @@ export class DashboardService {
       recommendationsGenerated,
       expiringDocuments,
       averageVendorRating: round2(toNumber(ratingAggregate._avg.rating)),
+      vendorsByStatus: series(
+        vendorsByStatus.map((row) => ({ label: row.status, count: row._count._all })),
+        VENDOR_STATUSES,
+      ),
+      requirementsByStatus: series(
+        requirementsByStatus.map((row) => ({ label: row.status, count: row._count._all })),
+        REQUIREMENT_STATUSES,
+      ),
+      requirementsByPriority: series(
+        requirementsByPriority.map((row) => ({ label: row.priority, count: row._count._all })),
+        PRIORITIES,
+      ),
+      vendorsByCategory: vendorsByCategory
+        .map((row) => ({ label: row.category, count: row._count._all }))
+        .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label))
+        .slice(0, 6),
+      documentsByStatus: series(
+        documentsByStatus.map((row) => ({ label: row.status, count: row._count._all })),
+        DOCUMENT_STATUSES,
+      ),
       recentRequirements: recentRequirements.map((requirement) => ({
         ...requirement,
         estimatedValue: toNumber(requirement.estimatedValue),

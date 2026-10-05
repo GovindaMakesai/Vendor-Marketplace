@@ -8,7 +8,7 @@ const links = [
 ];
 
 function navClass(isActive: boolean) {
-  return `rounded-lg px-3 py-2 text-sm font-medium ${isActive ? "bg-white/10 text-white" : "text-stone-300 hover:bg-white/5 hover:text-white"}`;
+  return `rounded-lg px-3 py-2 text-sm font-medium transition duration-200 ${isActive ? "bg-white/15 text-white shadow-sm" : "text-stone-300 hover:bg-white/10 hover:text-white"}`;
 }
 
 export function AppLayout() {

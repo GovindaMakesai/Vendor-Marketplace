@@ -18,9 +18,47 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--color-paper);
+  background:
+    radial-gradient(circle at top left, rgba(15, 111, 106, 0.09), transparent 26rem),
+    var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-sans);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.rise {
+  animation: rise 0.55s ease both;
+}
+
+.pulse-dot {
+  animation: pulse-dot 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .pulse-dot {
+    animation: none;
+  }
 }
 
 button,

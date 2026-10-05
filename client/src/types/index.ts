@@ -125,6 +125,11 @@ export type Paginated<T> = {
   pagination: Pagination;
 };
 
+export type ChartPoint = {
+  label: string;
+  count: number;
+};
+
 export type DashboardStats = {
   totalVendors: number;
   activeVendors: number;
@@ -134,6 +139,11 @@ export type DashboardStats = {
   recommendationsGenerated: number;
   expiringDocuments: number;
   averageVendorRating: number;
+  vendorsByStatus: ChartPoint[];
+  requirementsByStatus: ChartPoint[];
+  requirementsByPriority: ChartPoint[];
+  vendorsByCategory: ChartPoint[];
+  documentsByStatus: ChartPoint[];
   recentRequirements: Array<{
     id: string;
     title: string;

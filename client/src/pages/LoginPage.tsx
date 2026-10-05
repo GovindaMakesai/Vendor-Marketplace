@@ -32,7 +32,9 @@ export function LoginPage() {
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
-      <section className="hidden bg-ink px-12 py-16 text-white lg:flex lg:flex-col lg:justify-between">
+      <section className="relative hidden overflow-hidden bg-ink px-12 py-16 text-white lg:flex lg:flex-col lg:justify-between">
+        <div className="pointer-events-none absolute -left-16 top-24 h-56 w-56 rounded-full bg-teal-700/30 blur-3xl" />
+        <div className="pointer-events-none absolute bottom-10 right-0 h-40 w-40 rounded-full bg-orange-900/30 blur-3xl" />
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-200">Operations desk</p>
           <h1 className="mt-4 max-w-md text-4xl font-semibold leading-tight">Recommend the right vendor, and show the working.</h1>
@@ -43,7 +45,7 @@ export function LoginPage() {
         <p className="text-sm text-stone-400">Demo account: admin@demo.vendor.local</p>
       </section>
       <section className="flex items-center justify-center px-6 py-16">
-        <form onSubmit={onSubmit} className="w-full max-w-md space-y-4">
+        <form onSubmit={onSubmit} className="rise w-full max-w-md space-y-4">
           <div>
             <p className="text-sm font-semibold text-accent">Vendor Recommendation</p>
             <h2 className="mt-2 text-2xl font-semibold">{mode === "login" ? "Sign in" : "Create an operations account"}</h2>
