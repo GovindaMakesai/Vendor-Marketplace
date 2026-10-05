@@ -14,12 +14,13 @@ export class ApiError extends Error {
 
 export const TOKEN_KEY = "vrp_token";
 
+const LIVE_API_URL = "https://vendor-marketplace-cmhd.onrender.com/api";
+
 export function getApiUrl() {
   const configured = import.meta.env.VITE_API_URL?.trim();
   if (configured) return configured.replace(/\/$/, "");
   if (import.meta.env.DEV) return "http://localhost:5000/api";
-  // Production on one Vercel domain: /api is rewritten to the Express service.
-  return "/api";
+  return LIVE_API_URL;
 }
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {

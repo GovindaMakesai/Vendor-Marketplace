@@ -13,7 +13,10 @@ export function createApp() {
   app.set("trust proxy", 1);
   app.disable("x-powered-by");
 
-  const allowedOrigins = new Set([env.CLIENT_URL]);
+  const allowedOrigins = new Set([
+    env.CLIENT_URL,
+    "https://vendor-marketplace-chi.vercel.app",
+  ]);
   if (!isProduction) {
     allowedOrigins.add("http://localhost:5173");
     allowedOrigins.add("http://127.0.0.1:5173");

@@ -185,7 +185,7 @@ AI_PROVIDER=openai
 AI_DAILY_REQUEST_LIMIT=20
 AI_MAX_OUTPUT_TOKENS=300
 AI_TIMEOUT_MS=15000
-CLIENT_URL=http://localhost:5173
+CLIENT_URL=https://vendor-marketplace-chi.vercel.app
 PORT=5000
 ```
 
@@ -194,7 +194,7 @@ PORT=5000
 Frontend:
 
 ```text
-VITE_API_URL=http://localhost:5000/api
+VITE_API_URL=https://vendor-marketplace-cmhd.onrender.com/api
 ```
 
 ## Database Setup
@@ -224,11 +224,11 @@ DemoAdmin#2026
 
 ## Deployment
 
-One Vercel project serves both parts. The root `vercel.json` sends `/api` and `/health` to the Express service and every other path to the Vite dashboard. The browser calls `/api` on that same domain. Do not set `VITE_API_URL` for this setup. Do not set a service-binding variable; Vercel injects those itself, and this app does not use an internal binding because the dashboard runs in the browser.
+The live dashboard is [https://vendor-marketplace-chi.vercel.app](https://vendor-marketplace-chi.vercel.app). The live API is [https://vendor-marketplace-cmhd.onrender.com](https://vendor-marketplace-cmhd.onrender.com). The production dashboard calls `https://vendor-marketplace-cmhd.onrender.com/api`. The API allows the Vercel origin.
 
-Set these on the Vercel project, not in the frontend bundle: `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `AI_ENABLED`, `AI_PROVIDER`, `AI_DAILY_REQUEST_LIMIT`, `AI_MAX_OUTPUT_TOKENS`, `AI_TIMEOUT_MS`, and `CLIENT_URL` (the exact `https://` site origin, with no trailing slash).
+On Render, the start command must be `npm run start`. The build command is `npm install --include=dev && npm run build`. Set `CLIENT_URL` to `https://vendor-marketplace-chi.vercel.app`.
 
-A separate Render API is optional. If you use it, the start command must be `npm run start`. The build command is only `npm install --include=dev && npm run build`. Set `VITE_API_URL` to `https://<render-host>/api` when the dashboard is not on the same host as the API.
+On Vercel, leave `VITE_API_URL` unset so the dashboard uses the Render API above. Do not put database credentials, `JWT_SECRET`, or `OPENAI_API_KEY` in Vercel.
 
 ```text
 Build:  npm install --include=dev && npm run build
