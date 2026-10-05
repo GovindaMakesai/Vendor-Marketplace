@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  ADMIN
+  OPERATIONS
+}
+
+enum VendorStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum DocumentType {
+  TAX_REGISTRATION
+  INSURANCE
+  TRADE_LICENSE
+  SAFETY_CERTIFICATE
+  AGREEMENT
+  OTHER
+}
+
+enum DocumentStatus {
+  VALID
+  EXPIRED
+  PENDING
+  REJECTED
+}
+
+enum RequirementPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum RequirementStatus {
+  DRAFT
+  OPEN
+  RECOMMENDATIONS_GENERATED
+  AWARDED
+  CLOSED
+}
+
+enum RecommendationLevel {
+  HIGHLY_RECOMMENDED
+  RECOMMENDED
+  CONSIDER
+  NOT_RECOMMENDED
+}
+
+model User {
+  id               String            @id @default(cuid())
+  name             String
+  email            String            @unique
+  passwordHash     String
+  role             UserRole          @default(OPERATIONS)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  workRequirements WorkRequirement[]
+
+  @@map("users")
+}
+
+model Vendor {
+  id              String           @id @default(cuid())
+  name            String
+  vendorType      String
+  category        String
+  description     String
+  email           String
+  phone           String
+  address         String
+  city            String
+  state           String
+  country         String
+  rating          Decimal          @db.Decimal(3, 2)
+  status          VendorStatus     @default(ACTIVE)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  documents       VendorDocument[]
+  recommendations Recommendation[]
+
+  @@index([status])
+  @@index([category])
+  @@index([city])
+  @@map("vendors")
+}
+
+model VendorDocument {
+  id             String         @id @default(cuid())
+  vendorId       String
+  documentType   DocumentType
+  documentNumber String
+  issuedDate     DateTime
+  expiryDate     DateTime
+  status         DocumentStatus
+  fileName       String?
+  fileUrl        String?
+  notes          String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  vendor         Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, documentType, documentNumber])
+  @@index([vendorId])
+  @@index([expiryDate])
+  @@index([status])
+  @@map("vendor_documents")
+}
+
+model WorkRequirement {
+  id                String              @id @default(cuid())
+  title             String
+  description       String
+  category          String
+  location          String
+  estimatedValue    Decimal             @db.Decimal(12, 2)
+  priority          RequirementPriority
+  expectedStartDate DateTime
+  status            RequirementStatus   @default(DRAFT)
+  createdById       String
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  createdBy         User                @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  recommendations   Recommendation[]
+
+  @@index([category])
+  @@index([location])
+  @@index([status])
+  @@index([priority])
+  @@map("work_requirements")
+}
+
+model Recommendation {
+  id                  String               @id @default(cuid())
+  workRequirementId   String
+  vendorId            String
+  score               Decimal              @db.Decimal(5, 2)
+  rank                Int
+  recommendationLevel RecommendationLevel
+  categoryScore       Decimal              @db.Decimal(5, 2)
+  locationScore       Decimal              @db.Decimal(5, 2)
+  ratingScore         Decimal              @db.Decimal(5, 2)
+  complianceScore     Decimal              @db.Decimal(5, 2)
+  statusScore         Decimal              @db.Decimal(5, 2)
+  reasons             Json
+  warnings            Json
+  generatedAt         DateTime             @default(now())
+  workRequirement     WorkRequirement      @relation(fields: [workRequirementId], references: [id], onDelete: Cascade)
+  vendor              Vendor               @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([workRequirementId, vendorId])
+  @@index([workRequirementId])
+  @@index([vendorId])
+  @@index([score])
+  @@map("recommendations")
+}
