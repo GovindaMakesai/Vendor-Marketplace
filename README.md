@@ -2,6 +2,19 @@
 
 Operations teams use this platform to keep a vendor register, record compliance document metadata, open work requirements, and rank eligible vendors with a deterministic score. An optional AI summary explains the stored ranking. It does not choose the winner.
 
+## Live application
+
+| | |
+| --- | --- |
+| Dashboard | https://vendor-marketplace-chi.vercel.app/login |
+| Email | `admin@demo.vendor.local` |
+| Password | `DemoAdmin#2026` |
+| API | https://vendor-marketplace-cmhd.onrender.com/api |
+| API docs | https://vendor-marketplace-cmhd.onrender.com/api/docs |
+| GitHub | https://github.com/GovindaMakesai/Vendor-Marketplace |
+
+The free API can take up to a minute to wake before the first login succeeds.
+
 ## Overview
 
 The application is a single Node.js API and a React dashboard, backed by PostgreSQL. Recommendation scores are calculated in the API from the current vendor and document records. Regenerating a requirement with the same data produces the same order.
@@ -17,17 +30,26 @@ The application is a single Node.js API and a React dashboard, backed by Postgre
 - Dashboard counts, recent requirements, and current top recommendations
 - OpenAPI documentation at `/api/docs`
 
-## Architecture
+## Project Architecture
 
 ```text
-client/   React + Vite dashboard
-server/   Express API, recommendation service, Prisma
-PostgreSQL
+Browser (React dashboard on Vercel)
+        │  HTTPS, JWT in the Authorization header
+        ▼
+Express API on Render  (/api, /health)
+        │
+        ├── Zod validation and auth middleware
+        ├── Services: vendors, documents, requirements, dashboard
+        ├── RecommendationService → pure scoring functions
+        └── AI explanation module → OpenAI, or a local fallback
+        │
+        ▼
+PostgreSQL on Supabase, accessed with Prisma
 ```
 
-HTTP requests enter Express routes, pass through validation and authentication, and call a service. Controllers do not calculate scores. `RecommendationService` loads vendors and delegates scoring to pure functions in `server/src/services/scoring.ts`. Those functions do not read the database and do not use randomness.
+The repository is a monorepo. `client/` is the React dashboard. `server/` is the API. They deploy separately: the dashboard is on Vercel, the API is on Render, and the database is Supabase PostgreSQL. The browser calls the Render API directly. Requests to `/api` and `/health` on the Vercel domain are also forwarded to Render, so a same-origin call still reaches the API.
 
-The AI module receives the already stored ranking. If the model is unavailable, the API returns a summary built from the same records and marks it `generatedBy: "fallback"`.
+A request passes through Helmet, CORS, rate limits, and a Zod schema before a controller runs. Controllers do not calculate scores. `RecommendationService` loads vendors and documents, then calls pure functions in `server/src/services/scoring.ts`. Those functions do not read the database and do not use randomness. The AI module runs only after a ranking has been stored, and only when an operator clicks **Generate AI Summary**.
 
 ## Technology Stack
 
@@ -39,17 +61,22 @@ The AI module receives the already stored ranking. If the model is unavailable, 
 
 ## Database Design
 
-| Entity | Responsibility |
+PostgreSQL stores operational records. Prisma maps each model to a table. Primary keys are CUIDs. Money, ratings, and scores use `Decimal` so totals are not binary floating-point values. Reasons and warnings are JSON arrays.
+
+| Table | What it stores |
 | --- | --- |
-| User | Operations or admin account. Email is unique. Password is stored as a hash. |
-| Vendor | Company profile, location, rating, and status. |
-| VendorDocument | Metadata for a compliance document. No file bytes are stored. |
-| WorkRequirement | A piece of work that needs a vendor, owned by the user who created it. |
-| Recommendation | One stored score for a vendor against a requirement. |
+| `users` | Name, unique email, bcrypt `passwordHash`, and role `ADMIN` or `OPERATIONS`. |
+| `vendors` | Profile, category, city, state, country, rating (`Decimal(3,2)`), and status `ACTIVE`, `INACTIVE`, or `SUSPENDED`. |
+| `vendor_documents` | Document type, number, issued date, expiry date, status, and optional file name, URL, and notes. The file itself is not stored. |
+| `work_requirements` | Title, description, category, one location string, estimated value, priority, expected start date, status, and the user who created it. |
+| `recommendations` | One stored score per vendor for a requirement: total, rank, level, the five component scores, reasons, and warnings. |
+| `ai_usage_daily` | One row per UTC date and the number of OpenAI summary calls made that day. |
 
-Monetary values and scores use `Decimal`. Reasons and warnings are JSON arrays. Deleting a vendor removes its documents and recommendations. Deleting a work requirement removes its recommendations. Users are not cascade-deleted.
+Document types are `TAX_REGISTRATION`, `INSURANCE`, `TRADE_LICENSE`, `SAFETY_CERTIFICATE`, `AGREEMENT`, and `OTHER`. Document status is `VALID`, `EXPIRED`, `PENDING`, or `REJECTED`. Requirement status moves from `DRAFT` or `OPEN` to `RECOMMENDATIONS_GENERATED`, and can later be `AWARDED` or `CLOSED`. Recommendation level is `HIGHLY_RECOMMENDED`, `RECOMMENDED`, `CONSIDER`, or `NOT_RECOMMENDED`.
 
-Indexes cover vendor status, category, and city; document vendor, expiry, and status; requirement category, location, status, and priority; and recommendation requirement, vendor, and score. A vendor can have only one recommendation per requirement. A document number is unique for a vendor and document type.
+A vendor and document type can store a document number only once. A vendor can have only one recommendation row per work requirement. Deleting a vendor removes its documents and recommendations. Deleting a work requirement removes its recommendations. Deleting a user is restricted while that user still owns work requirements.
+
+Indexes cover vendor status, category, and city; document vendor, expiry, and status; requirement category, location, status, and priority; and recommendation requirement, vendor, and score. `ai_usage_daily.usageDate` is unique.
 
 ## Database Relationships
 
@@ -60,7 +87,11 @@ Vendor 1 ── * VendorDocument
 
 ## API Design
 
-All JSON responses use `{ success, data }` or `{ success: false, error: { code, message, details } }`.
+The API is REST over JSON. Every success response is `{ success: true, data }`. Every failure is `{ success: false, error: { code, message, details } }`. List endpoints use `page` and `limit`. Zod rejects an invalid body with `400 VALIDATION_ERROR` and a field path in `details`. Unknown records return `404`. Awarded or closed requirements return `409` if recommendations are generated again.
+
+Authentication is a bearer JWT. Vendor, document, requirement, recommendation, dashboard, and AI routes require `Authorization: Bearer <token>`. Register and login are public and rate limited. Registration always creates an `OPERATIONS` user. `GET /health` does not touch the database. Interactive documentation is at `/api/docs`.
+
+Dates sent by the client must fall between the years 1900 and 9999. A year outside that range is a validation error, because PostgreSQL cannot store it. An expiry date must be on or after the issued date.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -82,7 +113,7 @@ All JSON responses use `{ success, data }` or `{ success: false, error: { code, 
 
 Vendor, document, requirement, recommendation, and dashboard routes require `Authorization: Bearer <token>`.
 
-## Recommendation Algorithm
+## Recommendation Logic
 
 Only `ACTIVE` vendors are ranked. `INACTIVE` and `SUSPENDED` vendors are excluded before scoring.
 
@@ -109,25 +140,23 @@ When scores are equal, the higher vendor rating wins, then the higher compliance
 
 Generating recommendations replaces the stored rows for that requirement and sets its status to `RECOMMENDATIONS_GENERATED`. Awarded and closed requirements are left unchanged.
 
-## AI Architecture
+## AI Usage
 
 ```text
-Deterministic Recommendation Engine
-             ↓
-        AI Explanation
-             ↓
-       Structured Output
+Stored ranking (already calculated)
+        ↓
+POST /api/work-requirements/:id/ai-summary
+        ↓
+OpenAI Responses API, structured JSON
+        ↓
+summary, strengths, risks, tradeoffs, recommendation
 ```
 
-Business rules stay deterministic. The recommendation engine decides eligibility, compliance, score, and rank. OpenAI is only a decision-support explanation layer. It receives the already calculated result for the leading vendor and must not change the score or the ranking.
+The model explains the rank-1 vendor. It also receives the names and scores of the top three so the narrative can mention the order. It does not receive tools, and it is instructed not to change eligibility, compliance, score, rank, or the selected vendor. It must not invent documents, certifications, or history that are not in the stored result.
 
-`POST /api/work-requirements/:id/ai-summary` is authenticated and is called only when an operator clicks **Generate AI Summary**. Loading the dashboard, vendors, work requirements, or recommendations does not call OpenAI.
+The route is authenticated and runs only when an operator clicks **Generate AI Summary**. Opening the dashboard, vendors, requirements, or the ranking does not call OpenAI. The server reads `OPENAI_MODEL` from the environment. The call uses the official Node SDK, `store: false`, no tools, no automatic retries, a 15 second timeout, and a short output limit. The response is checked again with Zod. A valid response is marked `generatedBy: "openai"`.
 
-The server reads `OPENAI_MODEL` from the environment and calls the OpenAI Responses API with structured output. The model must return `summary`, `strengths`, `risks`, `tradeoffs`, and `recommendation`. The application checks that payload again with Zod. A successful response is marked `generatedBy: "openai"`.
-
-If the API key is missing, AI is disabled, the daily limit is reached, the request times out, the provider returns an error, or the payload is invalid, the API builds the same sections from the stored ranking and marks them `generatedBy: "fallback"`. `AI_PROVIDER=mock` returns a local sample and does not call OpenAI. Automatic retries are disabled. Each summary request makes at most one OpenAI call.
-
-Development usage is limited by `AI_DAILY_REQUEST_LIMIT` (20 by default). The counter is stored in `ai_usage_daily` and resets on the next UTC calendar date. The OpenAI API key stays in the server environment. It is not sent to the browser, written into API responses, or recorded in logs.
+One HTTP request makes at most one OpenAI call. The daily cap is `AI_DAILY_REQUEST_LIMIT` (20 by default), counted in `ai_usage_daily` for the current UTC date. If the key is missing, AI is disabled, the limit is reached, the call times out, the provider errors, or the JSON is invalid, the API writes the same five sections from the stored scores and warnings and marks them `generatedBy: "fallback"`. `AI_PROVIDER=mock` returns a local sample and does not call OpenAI or increment the counter. The API key stays in the server environment. It is not sent to the browser or written into API responses. Log lines redact values that look like OpenAI keys.
 
 ## Security
 
@@ -138,7 +167,7 @@ Development usage is limited by `AI_DAILY_REQUEST_LIMIT` (20 by default). The co
 - Auth routes are rate limited
 - Request bodies are validated with Zod
 - Production error responses do not include stack traces
-- Logs do not record passwords, tokens, database URLs, or API keys
+- Application logs do not include passwords or tokens. Values that look like OpenAI keys are redacted
 - The frontend receives only `VITE_API_URL`
 
 Self-registration creates an `OPERATIONS` user. The seeded administrator is created by the seed script.
@@ -243,20 +272,27 @@ Do not put database credentials, `JWT_SECRET`, or `OPENAI_API_KEY` in frontend e
 ## Assumptions
 
 - The workspace root is the application root. `client/` and `server/` live beside this README.
-- Required compliance documents are tax registration, insurance, and trade license.
+- Supabase is used as PostgreSQL only. Sign-in is the application's own bcrypt and JWT flow, not Supabase Auth.
+- Required compliance documents are tax registration, insurance, and trade license. Safety certificates, agreements, and other files can add warnings only.
+- Category match is an exact comparison after trimming and lowercasing. Close names do not score partial category points.
+- A work requirement has one location string. A same-city match is 20 points. The same state, or the region inferred from that string, is 10.
 - A past expiry date overrides a requested status and is stored as `EXPIRED`. `PENDING` and `REJECTED` are kept only while the document has not expired.
-- New work requirements default to `OPEN` when the client does not send a status.
+- New work requirements default to `OPEN` when the client does not send a status. The database default, used outside that route, is `DRAFT`.
 - Both authenticated roles can use the operational APIs. Registration cannot self-assign `ADMIN`.
 - Displayed money uses Australian dollars. The database stores the number only.
-- Rank filters such as `minScore` do not renumber the original ranks.
+- `limit` and `minScore` filter the stored list. They do not renumber the original ranks.
+- The AI summary explains the current rank-1 vendor. It is not a second scoring pass.
 
 ## Trade-offs
 
-- The service is one Express process. Background queues, caching, and a separate worker are unnecessary at this size.
+- The API is one Express process. Background queues, caching, and a separate worker are unnecessary at this size.
+- The dashboard and API are hosted separately. Render's free instance cannot reach the IPv6-only direct database host, so runtime uses the IPv4 Supabase pooler in session mode. Migrations use `DIRECT_URL`, which must also be a host that the machine running them can reach.
 - Document files are metadata only, so there is no object storage or virus scanning.
-- API tests mock Prisma. They prove request handling and scoring integration without requiring Supabase during unit tests. Migration and seed still need the real database.
+- Scores are replaced, not versioned. Generating recommendations again deletes the previous rows for that requirement. There is no audit trail of an earlier ranking.
+- The AI narrative covers the leading vendor, with the top three names for context. It does not write a separate explanation for every ranked vendor.
+- The AI call is short, stateless, and has no retry loop. A failed call returns the deterministic summary instead of blocking the operator. The daily counter is the credit-protection limit, and it is global for the UTC day rather than per user.
+- API tests use an in-memory stand-in for Prisma. They prove request handling and scoring integration without requiring Supabase. Migration and seed still need the real database.
 - Helmet's content security policy is relaxed so Swagger UI can load. The other Helmet headers remain enabled.
-- The AI call is short, stateless, and has no retry loop. A failed call returns the deterministic summary instead of blocking the user. The daily counter is the credit-protection limit.
 
 ## Future Improvements
 
